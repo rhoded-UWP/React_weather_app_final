@@ -11,16 +11,14 @@ The student is learning React. Keep code readable and explain your choices.
   and remind the student to commit package-lock.json.
 
 ## Components and responsibilities
-Put each component in its own file in src/components/.
-- App: owns selected location, unit preference, and weather state
+App: owns the selected location and the weather data (Module 9+: also the search status)
+
 - CitySelector (Module 8) / LocationSearch (Module 9+): chooses a location
 - CurrentConditions: temperature, feels-like, humidity, wind, condition
 - ForecastList: renders one ForecastCard per day with map and a stable key
 - ForecastCard: one day's high, low, condition, precipitation chance
-- UnitToggle: Imperial (°F, mph) / Metric (°C, km/h). Store Imperial; derive
-  Metric for display. Temperature and wind switch together.
 - StatusMessage (Module 9+): loading, not-found, error; uses aria-live
-- Attribution (Module 9+): "Weather data by Open-Meteo.com" link near the data
+- Attribution (Module 9+): "Weather data by Open-Meteo.com" link and a CC BY 4.0 license link near the data
 - SavedLocations (Module 10): saved locations persisted in localStorage
 
 ## Data
