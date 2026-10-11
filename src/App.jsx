@@ -10,7 +10,10 @@ import StatusMessage from './components/StatusMessage.jsx'
 
 export default function App() {
   // Where the search is up to. It goes 'idle' -> 'locating' -> 'loading' -> 'success',
-  // and each new search starts again at 'locating'.
+  // or 'idle' -> 'locating' -> 'not-found' when no place matches,
+  // or straight to 'invalid-zip' when the search is digits but not exactly five,
+  // or to 'error' from 'locating' or 'loading' when a request fails.
+  // Each new search starts again at 'locating'.
   const [status, setStatus] = useState('idle')
 
   // The place we found, e.g. { name: 'Platteville', admin1: 'Wisconsin', ... }.
@@ -25,46 +28,84 @@ export default function App() {
   // "async" lets us use "await", which pauses this function until each
   // request comes back, without freezing the page.
   async function handleSearch(query) {
+    // A search made only of digits must be a ZIP code, and US ZIP codes have
+    // exactly five digits. Catch a wrong length here, before sending any
+    // request. /^\d+$/ is a regular expression meaning "one or more digits,
+    // and nothing else", so city names (and anything with letters) skip this check.
+    if (/^\d+$/.test(query) && query.length !== 5) {
+      setStatus('invalid-zip')
+      return
+    }
+
     setStatus('locating')
 
-    // Step 1: turn the city name or ZIP code into a place with a latitude and longitude.
-    // URLSearchParams builds the "?name=...&count=5..." part and escapes
-    // spaces and other special characters for us.
-    const geocodingParams = new URLSearchParams({
-      name: query,
-      count: 5,
-      countryCode: 'US',
-    })
-    const geocodingResponse = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?${geocodingParams}`
-    )
-    const geocodingData = await geocodingResponse.json()
-    // Use the first match.
-    const foundPlace = geocodingData.results[0]
+    // "try" runs the code inside it. If anything in it throws an error (no
+    // internet connection, a server error, a reply that is not valid JSON),
+    // JavaScript jumps straight to "catch" instead of crashing the search.
+    try {
+      // Step 1: turn the city name or ZIP code into a place with a latitude and longitude.
+      // URLSearchParams builds the "?name=...&count=5..." part and escapes
+      // spaces and other special characters for us.
+      const geocodingParams = new URLSearchParams({
+        name: query,
+        count: 5,
+        countryCode: 'US',
+      })
+      const geocodingResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?${geocodingParams}`
+      )
+      // fetch only throws when the request never gets an answer. A server
+      // that answers with an error (like 500) still counts as a response, so
+      // we check response.ok (true for status 200-299) and throw ourselves.
+      if (!geocodingResponse.ok) {
+        throw new Error(`Geocoding request failed: ${geocodingResponse.status}`)
+      }
+      const geocodingData = await geocodingResponse.json()
 
-    setStatus('loading')
+      // When nothing matches, Open-Meteo leaves out the "results" key entirely.
+      // This is a successful answer, not a failure, so it gets its own
+      // message instead of going to "catch".
+      if (!geocodingData.results) {
+        setStatus('not-found')
+        return
+      }
 
-    // Step 2: get the weather for that latitude and longitude.
-    // "current" and "daily" list the fields our components read.
-    const forecastParams = new URLSearchParams({
-      latitude: foundPlace.latitude,
-      longitude: foundPlace.longitude,
-      current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m',
-      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
-      temperature_unit: 'fahrenheit',
-      wind_speed_unit: 'mph',
-      timezone: 'auto',
-    })
-    const forecastResponse = await fetch(
-      `https://api.open-meteo.com/v1/forecast?${forecastParams}`
-    )
-    const forecastData = await forecastResponse.json()
+      // Use the first match.
+      const foundPlace = geocodingData.results[0]
 
-    // Save both together, after both requests are done, so the name on
-    // screen always matches the weather under it.
-    setPlace(foundPlace)
-    setForecast(forecastData)
-    setStatus('success')
+      setStatus('loading')
+
+      // Step 2: get the weather for that latitude and longitude.
+      // "current" and "daily" list the fields our components read.
+      const forecastParams = new URLSearchParams({
+        latitude: foundPlace.latitude,
+        longitude: foundPlace.longitude,
+        current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+        temperature_unit: 'fahrenheit',
+        wind_speed_unit: 'mph',
+        timezone: 'auto',
+      })
+      const forecastResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?${forecastParams}`
+      )
+      if (!forecastResponse.ok) {
+        throw new Error(`Forecast request failed: ${forecastResponse.status}`)
+      }
+      const forecastData = await forecastResponse.json()
+
+      // Save both together, after both requests are done, so the name on
+      // screen always matches the weather under it.
+      setPlace(foundPlace)
+      setForecast(forecastData)
+      setStatus('success')
+    } catch (error) {
+      // Log the details for the developer, and show the user a plain message.
+      // Because 'error' is not a searching status, the Search button turns
+      // back on so the user can try again.
+      console.error(error)
+      setStatus('error')
+    }
   }
 
   // Turn off the Search button while a search is running. This is worked out

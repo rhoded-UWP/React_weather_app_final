@@ -1,6 +1,7 @@
 // Tells the user what the search is doing.
 // Props:
-//   status - 'idle', 'locating', 'loading', or 'success' (owned by App)
+//   status - 'idle', 'locating', 'loading', 'not-found', 'invalid-zip',
+//            'error', or 'success' (owned by App)
 //
 // The messages for each status. Success has no message, because the
 // weather itself appears on screen.
@@ -8,6 +9,9 @@ const messages = {
   idle: 'Enter a city or ZIP code to see the weather.',
   locating: 'Finding location...',
   loading: 'Loading weather...',
+  'not-found': 'No location matched. Check the spelling or try a ZIP code.',
+  'invalid-zip': 'ZIP codes must have five digits. Check the number and try again.',
+  error: 'Weather could not be loaded. Check your connection and try again.',
   success: '',
 }
 
